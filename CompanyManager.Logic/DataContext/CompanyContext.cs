@@ -21,9 +21,8 @@ namespace CompanyManager.Logic.DataContext
             DatabaseType = appSettings["Database:Type"] ?? DatabaseType;
             ConnectionString = appSettings[$"ConnectionStrings:{DatabaseType}ConnectionString"] ?? ConnectionString;
 
-            // Sql logging
+            // Start: Sql-Logging
             bool.TryParse(appSettings["Logging:Sql:Active"], out SqlLogging);
-
             SqlStartUp = appSettings["Logging:Sql:StartUp"] ?? SqlStartUp;
             SqlLogFilePath = appSettings["Logging:Sql:FilePath"] ?? SqlLogFilePath;
 
@@ -37,6 +36,7 @@ namespace CompanyManager.Logic.DataContext
                     }
                 }
             }
+            // End: Sql-Logging
         }
 
         #region properties

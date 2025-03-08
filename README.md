@@ -1,97 +1,18 @@
-# CompanyManager With AppSettings
+# CompanyManager With EF Logging
 
 **Lernziele:**
 
-- Wie die AppSettings in den Projekten verwendet wird.
+- Wie die SQL-Statements protokolliert werden.
 
-**Hinweis:** Als Startpunkt wird die Vorlage [CompanyManagerWithSqlite](https://github.com/leoggehrer/CompanyManagerWithSqlite) verwendet.
+**Hinweis:** Als Startpunkt wird die Vorlage [CompanyManagerWithSettings]https://github.com/leoggehrer/CompanyManagerWithSettings) verwendet.
 
 ## Vorbereitung
 
-Bevor mit der Umsetzung begonnen wird, sollte die Vorlage heruntergeladen und die Funktionalität verstanden werden. Zusätzlich sollte die Präsentation zum Thema 'AppSettings' durchgearbeitet werden. Die Präsentation finden Sie [hier](https://github.com/leoggehrer/Slides/tree/main/DotnetAppSettings).
+Bevor mit der Umsetzung begonnen wird, sollte die Vorlage heruntergeladen und die Funktionalität verstanden werden. Zusätzlich sollte die Präsentation zum Thema 'EF-Logging' durchgearbeitet werden. Die Präsentation finden Sie [hier](https://github.com/leoggehrer/Slides/tree/main/EFLogging).
 
-## Packages installieren
+## 'AppSettings' konfigurieren
 
-Das Laden der 'AppSettings' sollte von allen Projekten erfolgen können. Um diese Anforderung zu erfüllen, sollte das Laden der Einstellungen im Projekt `CompanyManager.Common` implementiert werden. Es müssen folgende Packages im Projekt `CompanyManager.Common` installiert werden:
-
-- Microsoft.Extensions.Configuration
-- Microsoft.Extensions.Configuration.Json
-- Microsoft.Extensions.Configuration.EnvironmentVariables
-
-## Erstellen der Klasse `AppSettings`
-
-Im Projekt `CompanyManager.Common` erstellen wir einen Ordner **Modules** und einen Unterordner **Configuration**. Anschließend erstellen wir in diesem Ordner eine Klasse mit dem Namen `AppSettings`. Diese Klasse wird als `Singleton` konzipiert. Die Umsetzung der Klasse ist wie folgt:
-
-```csharp
-namespace CompanyManager.Common.Modules.Configuration
-{
-    /// <summary>
-    /// Singleton class to manage application settings.
-    /// </summary>
-    public sealed class AppSettings : ISettings
-    {
-        #region fields
-        private static AppSettings _instance = new AppSettings();
-        private static IConfigurationRoot _configurationRoot;
-        #endregion fields
-
-        /// <summary>
-        /// Static constructor to initialize the configuration.
-        /// </summary>
-        static AppSettings()
-        {
-            var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-            var builder = new ConfigurationBuilder()
-                    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                    .AddJsonFile($"appsettings.{environmentName ?? "Development"}.json", optional: true)
-                    .AddEnvironmentVariables();
-
-            _configurationRoot = builder.Build();
-        }
-
-        #region properties
-        /// <summary>
-        /// Gets the singleton instance of the AppSettings class.
-        /// </summary>
-        public static AppSettings Instance => _instance;
-        #endregion properties
-
-        /// <summary>
-        /// Private constructor to prevent instantiation.
-        /// </summary>
-        private AppSettings()
-        {
-        }
-
-        /// <summary>
-        /// Indexer to get the configuration value by key.
-        /// </summary>
-        /// <param name="key">The configuration key.</param>
-        /// <returns>The configuration value.</returns>
-        public string? this[string key] => _configurationRoot[key];
-    }
-}
-```
-
-Damit diese Klasse auch in einen **Dependency Injection (DI)-Container** registriert werden kann, erstellen wir zu dieser Klasse eine Schnittstelle. Diese Schnittstelle befindet sich im Ordner **Contracts** bei den anderen Schnittstellen. Der Aufbau der Schnittstelle ist wie folgt definiert:
-
-```csharp
-namespace CompanyManager.Common.Contracts
-{
-    public interface ISettings
-    {
-        string? this[string key] { get; }
-    }
-}
-```
-
-## Auslesen von AppSettings-Daten
-
-Damit `AppSettings`-Daten definiert werden können, müssen in den ausführbaren Projekten die `AppSettings`-Dateien erstellt werden und die Daten im Format `json` definiert werden. In unserem Fall werden zwei Dateien erstellt. Die erste Datei hat den Namen `appsettings.json` und die zweite Datei hat den Namen `appsettings.Development.json`. 
-
-Die Datei `appsettings.json` enthält die allgemeinen Daten, die in allen Umgebungen verwendet werden. Die Datei `appsettings.Development.json` enthält die Daten, die nur in der Entwicklungsphase verwendet werden. Die Daten in den Dateien sehen wie folgt aus:
-
-***appsettings.json***
+Die Datei 'appsettings.json' wird wie folgt konfiguriert:
 
 ```json
 {
@@ -99,6 +20,11 @@ Die Datei `appsettings.json` enthält die allgemeinen Daten, die in allen Umgebu
     "LogLevel": {
       "Default": "Information",
       "Microsoft.AspNetCore": "Warning"
+    },
+    "Sql": {
+      "Active": "true",
+      "StartUp": "Delete",
+      "FilePath": "el-log.txt"
     }
   },
   "AllowedHosts": "*",
@@ -108,74 +34,88 @@ Die Datei `appsettings.json` enthält die allgemeinen Daten, die in allen Umgebu
 }
 ```
 
-***appsettings.Development.json***
+Im Abschnitt "Logging:Sql" werden einige Einstellungen für das Protokollieren der SQL-Statements definiert. Die folgende Tabelle erläutert die Werte:
 
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "ConnectionStrings": {
-    "SqliteConnectionString": "Data Source=CompanyManagerDb.db",
-    "SqlServerConnectionString": "Data Source=127.0.0.1,1433; Database=CompanyManagerDb;User Id=sa; Password=passme!1234;TrustServerCertificate=true"
-  }
-}
-```
+| Schlüssel | Wert       | Beschreibung |
+| --------- | ---------- | ------------ |
+| Active    | true       | Aktiviert das Protokollieren der SQL-Statements. |
+| StartUp   | Delete     | Löscht die Protokolldatei beim Start der Anwendung. |
+| FilePath  | el-log.txt | Der Pfad zur Protokolldatei. |
 
-> **ACHTUNG:** Die Dateien müssen als `Copy if newer` oder `Copy always` in den Eigenschaften eingestellt werden.
-
-## Verwendung der AppSettings-Daten
-
-Im `DataContext` werden die `AppSettings`-Daten ausgewertet. Dabei wird der Database-Typ, 'SqlServer' oder 'Sqlite', ausgewertet und der entsprechende 'ConnectionString' geladen. Die Auswertung der Daten erfolgt im statischen Konstruktor der `DataContext`-Klasse. Bevor allerdings die Datenbank 'SqlServer' verwendet werden kann, muss das Package `Microsoft.EntityFrameworkCore.SqlServer` im Projekt 'CompanyManager.Logic' installiert werden. 
-
-Hier ein Beispiel, wie die Daten ausgewertet werden:
+## Auswertung der Einstellungen und Implementierung des EF-Loggings
 
 ```csharp
 namespace CompanyManager.Logic.DataContext
 {
-    internal class CompanyContext : DbContext, Common.Contracts.IContext
+    internal class CompanyContext : DbContext, IContext
     {
         #region fields
-        private static string DatabaseType = "Sqlite";
-        private static string ConnectionString = "data source=CompanyManager.db";
+        private static readonly string DatabaseType = "";
+        private static readonly string ConnectionString = "";
+        private static readonly bool SqlLogging = false;
+        private static readonly string SqlStartUp = string.Empty;
+        private static readonly string SqlLogFilePath = string.Empty;
         #endregion fields
-
-        #region properties
-        ...
-        #endregion properties
 
         static CompanyContext()
         {
-            var appSettings = Modules.Configuration.AppSettings.Instance;
+            var appSettings = Common.Modules.Configuration.AppSettings.Instance;
 
             DatabaseType = appSettings["Database:Type"] ?? DatabaseType;
             ConnectionString = appSettings[$"ConnectionStrings:{DatabaseType}ConnectionString"] ?? ConnectionString;
+
+            // Start: Sql-Logging
+            bool.TryParse(appSettings["Logging:Sql:Active"], out SqlLogging);
+            SqlStartUp = appSettings["Logging:Sql:StartUp"] ?? SqlStartUp;
+            SqlLogFilePath = appSettings["Logging:Sql:FilePath"] ?? SqlLogFilePath;
+
+            if (SqlLogging)
+            {
+                if (SqlStartUp.Equals("Delete", StringComparison.CurrentCultureIgnoreCase))
+                {
+                    if (File.Exists(SqlLogFilePath))
+                    {
+                        File.Delete(SqlLogFilePath);
+                    }
+                }
+            }
+            // End: Sql-Logging
         }
+
+        #region properties
+        public DbSet<Entities.Company> CompanySet { get; set; }
+        public DbSet<Entities.Customer> CustomerSet { get; set; }
+        public DbSet<Entities.Employee> EmployeeSet { get; set; }
+        #endregion properties
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (DatabaseType == "Sqlite")
             {
                 optionsBuilder.UseSqlite(ConnectionString);
+
             }
             else if (DatabaseType == "SqlServer")
             {
                 optionsBuilder.UseSqlServer(ConnectionString);
             }
 
+            if (SqlLogging)
+            {
+                optionsBuilder.LogTo(msg => File.AppendAllText(SqlLogFilePath, msg + Environment.NewLine), LogLevel.Information)
+                              .EnableSensitiveDataLogging()
+                              .EnableSensitiveDataLogging(true);
+            }
+
             base.OnConfiguring(optionsBuilder);
         }
-        ...
     }
 }
 ```
 
 ## Testen des Systems
 
-Testen Sie die Anwendung mit der Datenbank 'SqlServer'. Dazu müssen Sie in den `appsettings.json` die Datenbank auf 'SqlServer' umstellen.
+Testen Sie die Anwendung mit der Datenbank mit den angegebenen Einstellungen und prüfen Sie die Protokoll-Datei.
 
 ## Hilfsmittel
 
